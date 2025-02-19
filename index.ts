@@ -4,22 +4,23 @@ import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
 import type { OAuth2Adapter } from "adminforth";
 import { AdminForthDataTypes } from "adminforth";
+import type { HttpExtra } from './types.js';
 
-interface OAuth2SSOPluginOptions {
+interface OAuthPluginOptions {
   emailField: string;
   emailConfirmedField?: string;
   adapters: OAuth2Adapter[];
 }
 
-export class OAuth2SSOPlugin extends AdminForthPlugin {
-  private options: OAuth2SSOPluginOptions;
-  private adminforth: IAdminForth;
+export class OAuthPlugin extends AdminForthPlugin {
+  private options: OAuthPluginOptions;
+  public adminforth: IAdminForth;
   private resource: AdminForthResource;
 
-  constructor(options: OAuth2SSOPluginOptions) {
+  constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
-      throw new Error('OAuth2SSOPlugin: emailField is required');
+      throw new Error('OAuthPlugin: emailField is required');
     }
     this.options = options;
   }
@@ -32,26 +33,26 @@ export class OAuth2SSOPlugin extends AdminForthPlugin {
 
     // Validate emailField exists in resource
     if (!resource.columns.find(col => col.name === this.options.emailField)) {
-      throw new Error(`OAuth2SSOPlugin: emailField "${this.options.emailField}" not found in resource columns`);
+      throw new Error(`OAuthPlugin: emailField "${this.options.emailField}" not found in resource columns`);
     }
 
     // Validate emailConfirmedField if provided
     if (this.options.emailConfirmedField) {
       const confirmedField = resource.columns.find(col => col.name === this.options.emailConfirmedField);
       if (!confirmedField) {
-        throw new Error(`OAuth2SSOPlugin: emailConfirmedField "${this.options.emailConfirmedField}" not found in resource columns`);
+        throw new Error(`OAuthPlugin: emailConfirmedField "${this.options.emailConfirmedField}" not found in resource columns`);
       }
       if (confirmedField.type !== AdminForthDataTypes.BOOLEAN) {
-        throw new Error(`OAuth2SSOPlugin: emailConfirmedField "${this.options.emailConfirmedField}" must be a boolean field`);
+        throw new Error(`OAuthPlugin: emailConfirmedField "${this.options.emailConfirmedField}" must be a boolean field`);
       }
     }
 
     // Make sure customization and loginPageInjections exist
-    if (!adminforth.config.customization) {
-      adminforth.config.customization = {};
-    }
-    if (!adminforth.config.customization.loginPageInjections) {
-      adminforth.config.customization.loginPageInjections = { underInputs: [] };
+    if (!adminforth.config.customization?.loginPageInjections) {
+      adminforth.config.customization = {
+        ...adminforth.config.customization,
+        loginPageInjections: { underInputs: [] }
+      };
     }
 
     // Register the component with the correct plugin path

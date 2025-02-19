@@ -1,17 +1,19 @@
 {
   "name": "@adminforth/oauth",
   "version": "1.0.0",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc && rsync -av --exclude 'node_modules' custom dist/",
     "rollout": "tsc && rsync -av --exclude 'node_modules' custom dist/",
     "prepare": "npm link adminforth"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/devforth/adminforth-sso-auth"
+    "url": "https://github.com/devforth/adminforth-oauth"
   },
-  "keywords": ["adminforth", "sso", "auth", "oauth", "google auth", "github auth"],
+  "keywords": ["adminforth", "oauth", "google auth", "github auth"],
   "author": "devforth",
   "license": "MIT",
   "description": "AdminForth OAuth Plugin",

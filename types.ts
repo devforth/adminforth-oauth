@@ -74,3 +74,11 @@ export interface PluginOptions {
     error?: string;
   }>;
 }
+
+export interface HttpExtra {
+  headers: Record<string, string>;
+  cookies: Record<string, string>;
+  requestUrl: string;
+  query: Record<string, any>;
+  body: Record<string, any>;
+}
