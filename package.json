@@ -4,6 +4,9 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && rsync -av --exclude 'node_modules' custom dist/",
     "rollout": "tsc && rsync -av --exclude 'node_modules' custom dist/",
