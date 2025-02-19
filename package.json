@@ -1,5 +1,5 @@
 {
-  "name": "@adminforth/sso-auth",
+  "name": "@adminforth/oauth",
   "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
   "keywords": ["adminforth", "sso", "auth", "oauth", "google auth", "github auth"],
   "author": "devforth",
   "license": "MIT",
-  "description": "AdminForth SSO Auth Plugin",
+  "description": "AdminForth OAuth Plugin",
   "devDependencies": {
     "@types/node": "^22.10.7",
     "semantic-release": "^24.2.1",
