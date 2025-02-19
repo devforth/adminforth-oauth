@@ -12,7 +12,7 @@ interface OAuthPluginOptions {
   adapters: OAuth2Adapter[];
 }
 
-export class OAuthPlugin extends AdminForthPlugin {
+export default class OAuthPlugin extends AdminForthPlugin {
   private options: OAuthPluginOptions;
   public adminforth: IAdminForth;
   private resource: AdminForthResource;
