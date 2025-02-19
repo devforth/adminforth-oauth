@@ -31,6 +31,22 @@ export class OAuthPlugin extends AdminForthPlugin {
     this.adminforth = adminforth;
     this.resource = resource;
 
+    // Add custom page for OAuth callback
+    if (!adminforth.config.customization.customPages) {
+      adminforth.config.customization.customPages = [];
+    }
+
+    adminforth.config.customization.customPages.push({
+      path: '/oauth/callback',
+      component: { 
+        file: this.componentPath('OAuthCallback.vue'), 
+        meta: { 
+          title: 'OAuth Callback',
+          customLayout: true 
+        }
+      }
+    });
+
     // Validate emailField exists in resource
     if (!resource.columns.find(col => col.name === this.options.emailField)) {
       throw new Error(`OAuthPlugin: emailField "${this.options.emailField}" not found in resource columns`);
