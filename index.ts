@@ -10,6 +10,13 @@ interface OAuthPluginOptions {
   emailField: string;
   emailConfirmedField?: string;
   adapters: OAuth2Adapter[];
+  iconOnly?: boolean;
+  pill?: boolean;
+  authenticationExpireDuration?: number;
+  openSignup?: {
+    enabled?: boolean;
+    defaultFieldValues?: Record<string, any>;
+  };
 }
 
 export default class OAuthPlugin extends AdminForthPlugin {
@@ -22,7 +29,17 @@ export default class OAuthPlugin extends AdminForthPlugin {
     if (!options.emailField) {
       throw new Error('OAuthPlugin: emailField is required');
     }
-    this.options = options;
+    
+    // Set default values for openSignup
+    this.options = {
+      ...options,
+      iconOnly: options.iconOnly ?? false,
+      pill: options.pill ?? false,
+      openSignup: {
+        enabled: options.openSignup?.enabled ?? false,
+        defaultFieldValues: options.openSignup?.defaultFieldValues ?? {},
+      }
+    };
   }
 
   async modifyResourceConfig(adminforth: IAdminForth, resource: AdminForthResource) {
@@ -30,11 +47,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
     
     this.adminforth = adminforth;
     this.resource = resource;
-
-    // Add custom page for OAuth callback
-    if (!adminforth.config.customization.customPages) {
-      adminforth.config.customization.customPages = [];
-    }
 
     adminforth.config.customization.customPages.push({
       path: '/oauth/callback',
@@ -72,24 +84,30 @@ export default class OAuthPlugin extends AdminForthPlugin {
     }
 
     // Register the component with the correct plugin path
-    const componentPath = `@@/plugins/${this.constructor.name}/OAuthLoginButton.vue`;
-    this.componentPath('OAuthLoginButton.vue');
+    const componentPath = `@@/plugins/${this.constructor.name}/OAuthLoginButtons.vue`;
+    this.componentPath('OAuthLoginButtons.vue');
 
     const baseUrl = adminforth.config.baseUrl || '';
-    this.options.adapters.forEach(adapter => {
+    const providers = this.options.adapters.map(adapter => {
       const state = Buffer.from(JSON.stringify({
         provider: adapter.constructor.name
       })).toString('base64');
 
-      adminforth.config.customization.loginPageInjections.underInputs.push({
-        file: componentPath,
-        meta: {
-          authUrl: `${adapter.getAuthUrl()}&state=${state}`,
-          provider: adapter.constructor.name,
-          baseUrl,
-          icon: adapter.getIcon?.() || ''
-        }
-      });
+      return {
+        authUrl: `${adapter.getAuthUrl()}&state=${state}`,
+        provider: adapter.constructor.name,
+        baseUrl,
+        icon: adapter.getIcon(),
+      };
+    });
+
+    adminforth.config.customization.loginPageInjections.underInputs.push({
+      file: componentPath,
+      meta: {
+        providers,
+        iconOnly: this.options.iconOnly,
+        pill: this.options.pill,
+      }
     });
   }
 
@@ -124,7 +142,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         response,
         username,
         pk: user.id,
-        expireInDays: this.adminforth.config.auth.rememberMeDays 
+        expireInDays: this.options.authenticationExpireDuration ? this.options.authenticationExpireDuration : this.adminforth.config.auth.rememberMeDays 
       });
     }
 
@@ -137,7 +155,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ query, response, headers, cookies, requestUrl }) => {
-        const { code, state } = query;
+        const { code, state, redirect_uri } = query;
         if (!code) {
           return { error: 'No authorization code provided' };
         }
@@ -155,20 +173,26 @@ export default class OAuthPlugin extends AdminForthPlugin {
             return { error: 'Invalid OAuth provider' };
           }
 
-          const userInfo = await adapter.getTokenFromCode(code);
+          const userInfo = await adapter.getTokenFromCode(code, redirect_uri);
 
           let user = await this.adminforth.resource(this.resource.resourceId).get([
             Filters.EQ(this.options.emailField, userInfo.email)
           ]);
 
           if (!user) {
+            // Check if open signup is enabled
+            if (!this.options.openSignup?.enabled) {
+              return { 
+                error: 'User not found and open signup is disabled',
+                redirectTo: '/login'
+              };
+            }
+
             // When creating a new user, set emailConfirmedField to true if it's configured
             const createData: any = {
-              id: randomUUID(),
-              created_at: new Date().toISOString(),
               [this.options.emailField]: userInfo.email,
-              role: 'user',
-              password_hash: ''
+              [this.adminforth.config.auth.passwordHashField]: '',
+              ...this.options.openSignup.defaultFieldValues
             };
             
             if (this.options.emailConfirmedField) {

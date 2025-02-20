@@ -18,12 +18,13 @@ onMounted(async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   const state = urlParams.get('state');
-  
-  if (code && state) {
+  const redirectUri = window.location.origin + '/oauth/callback';
+  if (code && state && redirectUri) {
     const encodedCode = encodeURIComponent(code);
     const encodedState = encodeURIComponent(state);
+    const encodedRedirectUri = encodeURIComponent(redirectUri);
     const response = await callAdminForthApi({
-      path: `/oauth/callback?code=${encodedCode}&state=${encodedState}`,
+      path: `/oauth/callback?code=${encodedCode}&state=${encodedState}&redirect_uri=${encodedRedirectUri}`,
       method: 'GET',
     });
     if (response.allowedLogin) {
