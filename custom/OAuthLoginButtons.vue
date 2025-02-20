@@ -1,9 +1,9 @@
 <template>
   <div :class="meta.iconOnly ? 'flex flex-row justify-center items-center gap-3' : 'flex flex-col justify-center items-center gap-2'" >
-    <button 
+    <a 
       v-for="provider in meta.providers" 
       :key="provider.provider"
-      @click="handleLogin(provider.authUrl)" 
+      :href="handleLogin(provider.authUrl)" 
       class="border dark:border-gray-400 flex items-center justify-center hover:bg-gray-50 hover:dark:border-gray-300 hover:dark:bg-gray-700"
       :class="[
         meta.iconOnly ? 'w-11 h-11 p-0' : 'w-full py-2 px-4',
@@ -12,7 +12,7 @@
     >
       <div v-html="provider.icon" class="w-6 h-6" :class="meta.iconOnly ? 'mr-0' : 'mr-4'" :alt="getProviderName(provider.provider)" />
       <span v-if="!meta.iconOnly" class="font-medium dark:text-white">Continue with {{ getProviderName(provider.provider) }}</span>
-    </button>
+    </a>
   </div>
 </template>
 
@@ -29,6 +29,9 @@ const getProviderName = (provider) => {
 };
 
 const handleLogin = (authUrl) => {
-  window.location.href = authUrl;
+  const redirectUri = window.location.origin + '/oauth/callback';
+  const url = new URL(authUrl);
+  url.searchParams.set('redirect_uri', redirectUri);
+  return url.toString();
 };
 </script>

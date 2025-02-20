@@ -155,7 +155,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ query, response, headers, cookies, requestUrl }) => {
-        const { code, state } = query;
+        const { code, state, redirect_uri } = query;
         if (!code) {
           return { error: 'No authorization code provided' };
         }
@@ -173,7 +173,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
             return { error: 'Invalid OAuth provider' };
           }
 
-          const userInfo = await adapter.getTokenFromCode(code);
+          const userInfo = await adapter.getTokenFromCode(code, redirect_uri);
 
           let user = await this.adminforth.resource(this.resource.resourceId).get([
             Filters.EQ(this.options.emailField, userInfo.email)
