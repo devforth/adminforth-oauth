@@ -47,15 +47,15 @@ export default class OAuthPlugin extends AdminForthPlugin {
     
     this.adminforth = adminforth;
     this.resource = resource;
-
     adminforth.config.customization.customPages.push({
       path: '/oauth/callback',
       component: { 
         file: this.componentPath('OAuthCallback.vue'), 
         meta: { 
           title: 'OAuth Callback',
-          customLayout: true 
-        }
+          customLayout: true,
+          baseUrl: adminforth.config.baseUrl,
+        },
       }
     });
 
@@ -87,7 +87,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
     const componentPath = `@@/plugins/${this.constructor.name}/OAuthLoginButtons.vue`;
     this.componentPath('OAuthLoginButtons.vue');
 
-    const baseUrl = adminforth.config.baseUrl || '';
     const providers = this.options.adapters.map(adapter => {
       const state = Buffer.from(JSON.stringify({
         provider: adapter.constructor.name
@@ -96,7 +95,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
       return {
         authUrl: `${adapter.getAuthUrl()}&state=${state}`,
         provider: adapter.constructor.name,
-        baseUrl,
         icon: adapter.getIcon(),
       };
     });
@@ -107,6 +105,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         providers,
         iconOnly: this.options.iconOnly,
         pill: this.options.pill,
+        baseUrl: adminforth.config.baseUrl,
       }
     });
   }

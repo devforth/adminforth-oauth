@@ -29,7 +29,10 @@ const getProviderName = (provider) => {
 };
 
 const handleLogin = (authUrl) => {
-  const redirectUri = window.location.origin + '/oauth/callback';
+  const baseUrl = props.meta.baseUrl;
+  const baseUrlSlashed = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const redirectUri = window.location.origin + baseUrlSlashed + 'oauth/callback';
+  
   const url = new URL(authUrl);
   url.searchParams.set('redirect_uri', redirectUri);
   return url.toString();
