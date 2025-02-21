@@ -10,7 +10,7 @@
         meta.pill ? 'rounded-full' : 'rounded-md'
       ]"
     >
-      <div v-html="provider.icon" class="w-6 h-6" :class="meta.iconOnly ? 'mr-0' : 'mr-4'" :alt="getProviderName(provider.provider)" />
+      <div v-html="provider.icon" class="w-6 h-6 dark:text-white" :class="meta.iconOnly ? 'mr-0' : 'mr-4'" :alt="getProviderName(provider.provider)" />
       <span v-if="!meta.iconOnly" class="font-medium dark:text-white">Continue with {{ getProviderName(provider.provider) }}</span>
     </a>
   </div>
@@ -29,7 +29,10 @@ const getProviderName = (provider) => {
 };
 
 const handleLogin = (authUrl) => {
-  const redirectUri = window.location.origin + '/oauth/callback';
+  const baseUrl = props.meta.baseUrl;
+  const baseUrlSlashed = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const redirectUri = window.location.origin + baseUrlSlashed + 'oauth/callback';
+  
   const url = new URL(authUrl);
   url.searchParams.set('redirect_uri', redirectUri);
   return url.toString();
