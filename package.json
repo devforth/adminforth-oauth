@@ -4,6 +4,7 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "homepage": "https://adminforth.dev/docs/tutorial/Plugins/OAuth/",
   "publishConfig": {
     "access": "public"
   },
