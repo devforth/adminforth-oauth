@@ -10,6 +10,7 @@ interface OAuthPluginOptions {
   emailField: string;
   emailConfirmedField?: string;
   adapters: OAuth2Adapter[];
+  buttonText?: string;
   iconOnly?: boolean;
   pill?: boolean;
   authenticationExpireDuration?: number;
@@ -82,7 +83,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         loginPageInjections: { underInputs: [] }
       };
     }
-
+    
     // Register the component with the correct plugin path
     const componentPath = `@@/plugins/${this.constructor.name}/OAuthLoginButtons.vue`;
     this.componentPath('OAuthLoginButtons.vue');
@@ -91,11 +92,11 @@ export default class OAuthPlugin extends AdminForthPlugin {
       const state = Buffer.from(JSON.stringify({
         provider: adapter.constructor.name
       })).toString('base64');
-
       return {
         authUrl: `${adapter.getAuthUrl()}&state=${state}`,
         provider: adapter.constructor.name,
         icon: adapter.getIcon(),
+        buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
       };
     });
 

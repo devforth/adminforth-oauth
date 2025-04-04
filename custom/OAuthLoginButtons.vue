@@ -11,7 +11,7 @@
       ]"
     >
       <div v-html="provider.icon" class="w-6 h-6 dark:text-white" :class="meta.iconOnly ? 'mr-0' : 'mr-4'" :alt="getProviderName(provider.provider)" />
-      <span v-if="!meta.iconOnly" class="font-medium dark:text-white">Continue with {{ getProviderName(provider.provider) }}</span>
+      <span v-if="!meta.iconOnly" class="font-medium dark:text-white">{{ getButtonText(provider.buttonText) }}</span>
     </a>
   </div>
 </template>
@@ -26,6 +26,9 @@ const props = defineProps({
 
 const getProviderName = (provider) => {
   return provider.replace('AdminForthAdapter', '').replace('Oauth2', '');
+};
+const getButtonText = (buttonText) => {
+  return buttonText.replace('AdminForthAdapter', '').replace('Oauth2', '');
 };
 
 const handleLogin = (authUrl) => {
