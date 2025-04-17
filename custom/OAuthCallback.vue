@@ -3,16 +3,16 @@
     <div v-if="error" class="py-8 px-4 mx-auto max-w-screen-xl lg:py-16 lg:px-6">
       <div class="mx-auto max-w-screen-sm text-center">
         <h1 class="mb-4 text-7xl tracking-tight font-extrabold lg:text-9xl text-lightPrimary dark:text-darkPrimary">
-          Oops!
+          {{$t('Oops!')}}
         </h1>
         <p class="mb-4 text-3xl tracking-tight font-bold text-gray-900 md:text-4xl dark:text-white">
-          Authentication Failed
+          {{$t('Authentication Failed')}}
         </p>
         <p class="mb-4 text-lg font-light text-gray-500 dark:text-gray-400">
           {{ error }}
         </p>
         <div class="flex justify-center">
-          <LinkButton to="/login">Back to Login</LinkButton>
+          <LinkButton to="/login">{{$t('Back to Login')}}</LinkButton>
         </div>
       </div>
     </div>
@@ -26,6 +26,9 @@ import { useUserStore } from '@/stores/user';
 import { useRouter, useRoute } from 'vue-router';
 import { callAdminForthApi } from '@/utils';
 import { Spinner, LinkButton } from '@/afcl';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -57,7 +60,7 @@ onMounted(async () => {
       error.value = response.error;
     }
   } else {
-    error.value = 'Invalid authentication request. Missing required parameters.';
+    error.value = t('Invalid authentication request. Missing required parameters.');
   }
 });
 </script>
