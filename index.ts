@@ -151,7 +151,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
 
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
-      method: 'GET',
+      method: 'POST',
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ query, response, headers, cookies, requestUrl }) => {

@@ -17,7 +17,12 @@
     "type": "git",
     "url": "https://github.com/devforth/adminforth-oauth"
   },
-  "keywords": ["adminforth", "oauth", "google auth", "github auth"],
+  "keywords": [
+    "adminforth",
+    "oauth",
+    "google auth",
+    "github auth"
+  ],
   "author": "devforth",
   "license": "MIT",
   "description": "AdminForth OAuth Plugin",
@@ -50,5 +55,8 @@
         "prerelease": true
       }
     ]
+  },
+  "dependencies": {
+    "adminforth": "^2.9.5"
   }
 }

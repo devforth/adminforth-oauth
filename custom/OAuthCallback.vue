@@ -49,7 +49,7 @@ onMounted(async () => {
     const encodedState = encodeURIComponent(state);
     const response = await callAdminForthApi({
       path: `/oauth/callback?code=${encodedCode}&state=${encodedState}&redirect_uri=${redirectUri}`,
-      method: 'GET',
+      method: 'POST',
     });
     
     if (response.allowedLogin) {
