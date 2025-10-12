@@ -80,7 +80,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     if (!adminforth.config.customization?.loginPageInjections) {
       adminforth.config.customization = {
         ...adminforth.config.customization,
-        loginPageInjections: { underInputs: [] }
+        loginPageInjections: { underInputs: [], panelHeader: [] }
       };
     }
     
