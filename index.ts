@@ -111,6 +111,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       }
     });
   }
+  
 
   async doLogin(email: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
     const username = email;
