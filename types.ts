@@ -73,6 +73,11 @@ export interface PluginOptions {
     allowed: boolean;
     error?: string;
   }>;
+
+  /**
+   * Order of components under the login button, if there is more than one injected component
+   */
+  componentsOrderUnderLoginButton?: number;
 }
 
 export interface HttpExtra {

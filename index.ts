@@ -18,6 +18,7 @@ interface OAuthPluginOptions {
     enabled?: boolean;
     defaultFieldValues?: Record<string, any>;
   };
+  componentsOrderUnderLoginButton?: number;
 }
 
 export default class OAuthPlugin extends AdminForthPlugin {
@@ -43,9 +44,9 @@ export default class OAuthPlugin extends AdminForthPlugin {
     };
   }
 
-  async modifyResourceConfig(adminforth: IAdminForth, resource: AdminForthResource) {
-    await super.modifyResourceConfig(adminforth, resource);
-    
+  modifyResourceConfig(adminforth: IAdminForth, resource: AdminForthResource) {
+    super.modifyResourceConfig(adminforth, resource);
+
     this.adminforth = adminforth;
     this.resource = resource;
     adminforth.config.customization.customPages.push({
@@ -80,7 +81,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     if (!adminforth.config.customization?.loginPageInjections) {
       adminforth.config.customization = {
         ...adminforth.config.customization,
-        loginPageInjections: { underInputs: [], panelHeader: [] }
+        loginPageInjections: { underInputs: [], underLoginButton: [], panelHeader: [] }
       };
     }
     
@@ -99,10 +100,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
         buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
       };
     });
-
-    adminforth.config.customization.loginPageInjections.underInputs.push({
+    (adminforth.config.customization.loginPageInjections.underLoginButton as Array<any>).push({
       file: componentPath,
       meta: {
+        afOrder: this.options.componentsOrderUnderLoginButton || 0,
         providers,
         iconOnly: this.options.iconOnly,
         pill: this.options.pill,
@@ -134,9 +135,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       username,
     };
     const toReturn = { allowedLogin: true, error: '' };
-
     await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, extra);
-    
     if (toReturn.allowedLogin) {
       this.adminforth.auth.setAuthCookie({ 
         response,
@@ -145,7 +144,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
         expireInDays: this.options.authenticationExpireDuration ? this.options.authenticationExpireDuration : this.adminforth.config.auth.rememberMeDays 
       });
     }
-
     return toReturn;
   }
 
