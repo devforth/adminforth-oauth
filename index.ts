@@ -55,7 +55,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         file: this.componentPath('OAuthCallback.vue'), 
         meta: { 
           title: 'OAuth Callback',
-          customLayout: true,
+          sidebarAndHeader: "none",
           baseUrl: adminforth.config.baseUrl,
         },
       }
