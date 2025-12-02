@@ -111,17 +111,9 @@ export default class OAuthPlugin extends AdminForthPlugin {
       }
     });
   }
-  
 
-  async doLogin(email: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
+  async doLogin(email: string, user: any, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
     const username = email;
-    const user = await this.adminforth.resource(this.resource.resourceId).get([
-      Filters.EQ(this.options.emailField, email)
-    ]);
-    
-    if (!user) {
-      return { error: 'User not found', allowedLogin: false };
-    }
 
     // If emailConfirmedField is set and the field is false, update it to true
     if (this.options.emailConfirmedField && user[this.options.emailConfirmedField] === false) {
@@ -136,13 +128,16 @@ export default class OAuthPlugin extends AdminForthPlugin {
       username,
     };
     const toReturn = { allowedLogin: true, error: '' };
-    await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, extra);
+    const sessionDuration = this.options.authenticationExpireDuration ? this.options.authenticationExpireDuration : this.adminforth.config.auth.rememberMeDuration;
+
+    await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, extra, sessionDuration);
+
     if (toReturn.allowedLogin) {
       this.adminforth.auth.setAuthCookie({ 
         response,
         username,
         pk: user.id,
-        expireInDays: this.options.authenticationExpireDuration ? this.options.authenticationExpireDuration : this.adminforth.config.auth.rememberMeDays 
+        expireInDuration: sessionDuration 
       });
     }
     return toReturn;
@@ -200,7 +195,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
             user = await this.adminforth.resource(this.resource.resourceId).create(createData);
           }
 
-          return await this.doLogin(userInfo.email, response, { 
+          return await this.doLogin(userInfo.email, user, response, { 
             headers, 
             cookies, 
             requestUrl,
