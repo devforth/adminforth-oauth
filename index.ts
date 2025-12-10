@@ -1,10 +1,9 @@
-import { AdminForthPlugin, Filters, AdminUser } from "adminforth";
+import { AdminForthPlugin, Filters, AdminUser, HttpExtra } from "adminforth";
 import type { IAdminForth, AdminForthResource } from "adminforth";
 import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
 import type { OAuth2Adapter } from "adminforth";
 import { AdminForthDataTypes } from "adminforth";
-import type { HttpExtra } from './types.js';
 
 interface OAuthPluginOptions {
   emailField: string;
@@ -138,19 +137,21 @@ export default class OAuthPlugin extends AdminForthPlugin {
       });
     }
 
-    const adminUser = { 
-      dbUser: user,
-      pk: user.id,
-      username,
-    };
-    const toReturn = { allowedLogin: true, error: '' };
-    await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, extra);
+  const adminUser = { 
+    dbUser: user,
+    pk: user.id,
+    username,
+  };
+  const toReturn = { allowedLogin: true, error: '' };
+  
+  const rememberMeDays = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDays;
+  await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDays);
     if (toReturn.allowedLogin) {
       this.adminforth.auth.setAuthCookie({ 
         response,
         username,
         pk: user.id,
-        expireInDays: this.options.authenticationExpireDuration ? this.options.authenticationExpireDuration : this.adminforth.config.auth.rememberMeDays 
+        expireInDays: rememberMeDays
       });
     }
     return toReturn;
