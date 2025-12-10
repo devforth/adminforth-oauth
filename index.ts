@@ -9,6 +9,7 @@ import type { HttpExtra } from './types.js';
 interface OAuthPluginOptions {
   emailField: string;
   emailConfirmedField?: string;
+  userFullNameField?: string;
   adapters: OAuth2Adapter[];
   buttonText?: string;
   iconOnly?: boolean;
@@ -74,6 +75,13 @@ export default class OAuthPlugin extends AdminForthPlugin {
       }
       if (confirmedField.type !== AdminForthDataTypes.BOOLEAN) {
         throw new Error(`OAuthPlugin: emailConfirmedField "${this.options.emailConfirmedField}" must be a boolean field`);
+      }
+    }
+
+    if (this.options.userFullNameField) {
+      const nameField = resource.columns.find(col => col.name === this.options.userFullNameField);
+      if (!nameField) {
+        throw new Error(`OAuthPlugin: userFullNameField "${this.options.userFullNameField}" not found in resource columns`);
       }
     }
 
@@ -198,6 +206,16 @@ export default class OAuthPlugin extends AdminForthPlugin {
             }
 
             user = await this.adminforth.resource(this.resource.resourceId).create(createData);
+          }
+
+          if ( this.options.userFullNameField && userInfo.fullName ) {
+            const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
+            const userFullName = user[this.options.userFullNameField];
+            if (userFullName && userFullName !== userInfo.fullName) {
+              await this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {
+                [this.options.userFullNameField]: userInfo.fullName
+              });
+            }
           }
 
           return await this.doLogin(userInfo.email, response, { 
