@@ -56,7 +56,7 @@
       }
     ]
   },
-  "dependencies": {
+  "peerDependencies": {
     "adminforth": "^2.13.0-next.43"
   }
 }
