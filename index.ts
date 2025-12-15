@@ -19,13 +19,15 @@ interface OAuthPluginOptions {
     defaultFieldValues?: Record<string, any>;
   };
   componentsOrderUnderLoginButton?: number;
+  userAvatarField?: string;
 }
 
 export default class OAuthPlugin extends AdminForthPlugin {
   private options: OAuthPluginOptions;
   public adminforth: IAdminForth;
   private resource: AdminForthResource;
-
+  public avatarUploadPlugin: any;
+  
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
@@ -107,6 +109,12 @@ export default class OAuthPlugin extends AdminForthPlugin {
         buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
       };
     });
+
+
+    const plugins = this.resource.plugins;
+    const avatarUploadPlugin = plugins.find(p => (p as any).options?.pathColumnName === this.options.userAvatarField);
+    this.avatarUploadPlugin = avatarUploadPlugin;
+
     (adminforth.config.customization.loginPageInjections.underLoginButton as Array<any>).push({
       file: componentPath,
       meta: {
@@ -119,6 +127,25 @@ export default class OAuthPlugin extends AdminForthPlugin {
     });
   }
   
+
+  validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
+    if (this.options.userAvatarField) {
+      for (const adapter of this.options.adapters) {
+        if ((adapter as any).useOpenID === true || (adapter as any).useOpenIdConnect === true) {
+          throw new Error(`OAuthPlugin: userAvatarField is not supported with OpenID adapters`);
+        }
+      }
+      //console.log(this.resource.plugins);
+
+
+      if (!this.avatarUploadPlugin) {
+        throw new Error(`OAuthPlugin: userAvatarField "${this.options.userAvatarField}" requires an upload plugin configured for the same field`);
+      }
+      //const uploadPlugin 
+      //const uploadPlugin = this.resource
+
+    }
+  }
 
   async doLogin(email: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
     const username = email;
@@ -217,6 +244,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
                 [this.options.userFullNameField]: userInfo.fullName
               });
             }
+          }
+
+          if ( this.options.userAvatarField && userInfo.profilePictureUrl ) {
+            console.log("HERE WE IMITATING SAVING USING UPLOAD PLUGIN", this.avatarUploadPlugin);
           }
 
           return await this.doLogin(userInfo.email, response, { 
