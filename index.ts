@@ -247,7 +247,38 @@ export default class OAuthPlugin extends AdminForthPlugin {
           }
 
           if ( this.options.userAvatarField && userInfo.profilePictureUrl ) {
-            console.log("HERE WE IMITATING SAVING USING UPLOAD PLUGIN", this.avatarUploadPlugin);
+            const user = await this.adminforth.resource(this.resource.resourceId).get(Filters.EQ(this.options.emailField, userInfo.email));
+            if (user && user[this.options.userAvatarField] === null) {
+              const avatarResponse = await fetch(userInfo.profilePictureUrl);
+              const blob = await avatarResponse.blob();
+              const fileType = blob.type;
+              const fileExtension = fileType.split('/')[1];
+              const fileName=`avatar_${user[this.options.emailField]}_${randomUUID()}`;
+              const file = new File([blob], fileName, { type: fileType });
+              const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
+                fileName,
+                fileType,
+                null,
+                fileExtension,
+                null
+              )
+              const res = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': fileType,
+                  ...uploadExtraParams
+                },
+                body: file
+              });
+
+              const success = res.ok;
+              if (!success) {
+                console.error('Failed to upload avatar for user', user[this.options.emailField]);
+              } else {
+                const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
+                this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
+              }
+            }
           }
 
           return await this.doLogin(userInfo.email, response, { 
