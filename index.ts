@@ -19,13 +19,15 @@ interface OAuthPluginOptions {
     defaultFieldValues?: Record<string, any>;
   };
   componentsOrderUnderLoginButton?: number;
+  userAvatarField?: string;
 }
 
 export default class OAuthPlugin extends AdminForthPlugin {
   private options: OAuthPluginOptions;
   public adminforth: IAdminForth;
   private resource: AdminForthResource;
-
+  public avatarUploadPlugin: any;
+  
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
@@ -107,6 +109,12 @@ export default class OAuthPlugin extends AdminForthPlugin {
         buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
       };
     });
+
+
+    const plugins = this.resource.plugins;
+    const avatarUploadPlugin = plugins.find(p => (p as any).options?.pathColumnName === this.options.userAvatarField);
+    this.avatarUploadPlugin = avatarUploadPlugin;
+
     (adminforth.config.customization.loginPageInjections.underLoginButton as Array<any>).push({
       file: componentPath,
       meta: {
@@ -119,6 +127,25 @@ export default class OAuthPlugin extends AdminForthPlugin {
     });
   }
   
+
+  validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
+    if (this.options.userAvatarField) {
+      for (const adapter of this.options.adapters) {
+        if ((adapter as any).useOpenID === true || (adapter as any).useOpenIdConnect === true) {
+          throw new Error(`OAuthPlugin: userAvatarField is not supported with OpenID adapters`);
+        }
+      }
+      //console.log(this.resource.plugins);
+
+
+      if (!this.avatarUploadPlugin) {
+        throw new Error(`OAuthPlugin: userAvatarField "${this.options.userAvatarField}" requires an upload plugin configured for the same field`);
+      }
+      //const uploadPlugin 
+      //const uploadPlugin = this.resource
+
+    }
+  }
 
   async doLogin(email: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
     const username = email;
@@ -216,6 +243,41 @@ export default class OAuthPlugin extends AdminForthPlugin {
               await this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {
                 [this.options.userFullNameField]: userInfo.fullName
               });
+            }
+          }
+
+          if ( this.options.userAvatarField && userInfo.profilePictureUrl ) {
+            const user = await this.adminforth.resource(this.resource.resourceId).get(Filters.EQ(this.options.emailField, userInfo.email));
+            if (user && user[this.options.userAvatarField] === null) {
+              const avatarResponse = await fetch(userInfo.profilePictureUrl);
+              const blob = await avatarResponse.blob();
+              const fileType = blob.type;
+              const fileExtension = fileType.split('/')[1];
+              const fileName=`avatar_${user[this.options.emailField]}_${randomUUID()}`;
+              const file = new File([blob], fileName, { type: fileType });
+              const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
+                fileName,
+                fileType,
+                null,
+                fileExtension,
+                null
+              )
+              const res = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': fileType,
+                  ...uploadExtraParams
+                },
+                body: file
+              });
+
+              const success = res.ok;
+              if (!success) {
+                console.error('Failed to upload avatar for user', user[this.options.emailField]);
+              } else {
+                const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
+                this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
+              }
             }
           }
 
