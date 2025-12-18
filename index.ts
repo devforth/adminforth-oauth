@@ -275,6 +275,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
               if (!success) {
                 console.error('Failed to upload avatar for user', user[this.options.emailField]);
               } else {
+                await this.avatarUploadPlugin.markKeyForNotDeletion(filePath);
                 const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
                 this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
               }
