@@ -13,7 +13,7 @@ interface OAuthPluginOptions {
   buttonText?: string;
   iconOnly?: boolean;
   pill?: boolean;
-  authenticationExpireDuration?: number;
+  authenticationExpireDuration?: string;
   openSignup?: {
     enabled?: boolean;
     defaultFieldValues?: Record<string, any>;
@@ -171,14 +171,14 @@ export default class OAuthPlugin extends AdminForthPlugin {
   };
   const toReturn = { allowedLogin: true, error: '' };
   
-  const rememberMeDays = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDays;
-  await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDays);
+  const rememberMeDuration = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDuration;
+  await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDuration);
     if (toReturn.allowedLogin) {
       this.adminforth.auth.setAuthCookie({ 
         response,
         username,
         pk: user.id,
-        expireInDays: rememberMeDays
+        expireInDuration: rememberMeDuration
       });
     }
     return toReturn;
