@@ -127,6 +127,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
     });
   }
   
+ 
+  instanceUniqueRepresentation(pluginOptions: any) : string {
+    return `single`;
+  }
 
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     if (this.options.userAvatarField) {
