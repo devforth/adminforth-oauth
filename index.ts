@@ -46,6 +46,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     };
   }
 
+  
   modifyResourceConfig(adminforth: IAdminForth, resource: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resource);
 
@@ -130,6 +131,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
  
   instanceUniqueRepresentation(pluginOptions: any) : string {
     return `single`;
+  }
+
+  shouldHaveSingleInstancePerWholeApp(): boolean {
+    return true;
   }
 
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
