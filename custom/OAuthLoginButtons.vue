@@ -10,7 +10,7 @@
         meta.pill ? 'rounded-full' : 'rounded-md'
       ]"
     >
-      <div v-html="provider.icon" class="w-6 h-6 dark:text-white" :class="meta.iconOnly ? 'mr-0' : 'mr-2'" :alt="getProviderName(provider.provider)" />
+      <div v-html="provider.icon" class="w-5 h-5 dark:text-white" :class="meta.iconOnly ? 'mr-0' : 'mr-2'" :alt="getProviderName(provider.provider)" />
       <span v-if="!meta.iconOnly" class="font-medium dark:text-white">{{ getButtonText(provider.buttonText) }}</span>
     </a>
   </div>
