@@ -44,6 +44,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         defaultFieldValues: options.openSignup?.defaultFieldValues ?? {},
       }
     };
+    this.shouldHaveSingleInstancePerWholeApp = () => true;
   }
 
   
@@ -133,9 +134,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
     return `single`;
   }
 
-  shouldHaveSingleInstancePerWholeApp(): boolean {
-    return true;
-  }
 
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     if (this.options.userAvatarField) {
