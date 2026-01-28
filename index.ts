@@ -294,7 +294,8 @@ export default class OAuthPlugin extends AdminForthPlugin {
             cookies, 
             requestUrl,
             query,
-            body: {}
+            body: {},
+            response
           });
         } catch (error) {
           console.error('OAuth authentication error:', error);
