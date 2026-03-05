@@ -9,9 +9,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && rsync -av --exclude 'node_modules' custom dist/",
-    "rollout": "tsc && rsync -av --exclude 'node_modules' custom dist/",
-    "prepare": "npm link adminforth"
+    "build": "tsc && rsync -av --exclude 'node_modules' custom dist/"
   },
   "repository": {
     "type": "git",
@@ -41,6 +39,7 @@
       [
         "semantic-release-slack-bot",
         {
+          "packageName": "@adminforth/oauth",
           "notifyOnSuccess": true,
           "notifyOnFail": true,
           "slackIcon": ":package:",
@@ -57,6 +56,6 @@
     ]
   },
   "peerDependencies": {
-    "adminforth": "next"
+    "adminforth": "^2.24.0"
   }
 }
