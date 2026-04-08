@@ -1,9 +1,9 @@
-import type { AdminForthResource, IAdminForth, IHttpServer } from 'adminforth';
+import type { AdminForthResource, IAdminForth, IHttpServer, PluginsCommonOptions } from 'adminforth';
 
 /**
  * Configuration for an OAuth2 provider adapter
  */
-export interface OAuth2ProviderAdapter {
+export interface OAuth2ProviderAdapter extends PluginsCommonOptions {
   /**
    * Unique identifier for this OAuth provider
    */
