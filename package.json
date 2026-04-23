@@ -21,7 +21,7 @@
     "google auth",
     "github auth"
   ],
-  "author": "devforth",
+  "author": "DevForth (https://devforth.io)",
   "license": "MIT",
   "description": "AdminForth OAuth Plugin",
   "devDependencies": {
