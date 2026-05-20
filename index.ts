@@ -134,6 +134,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
     return `single`;
   }
 
+  private serverFetchUrl(url: string, internalApiOrigin: string): string {
+    return new URL(url, internalApiOrigin).toString();
+  }
+
 
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     if (this.options.userAvatarField) {
@@ -252,16 +256,14 @@ export default class OAuthPlugin extends AdminForthPlugin {
               });
             }
           }
-
           if ( this.options.userAvatarField && userInfo.profilePictureUrl ) {
             const user = await this.adminforth.resource(this.resource.resourceId).get(Filters.EQ(this.options.emailField, userInfo.email));
             if (user && user[this.options.userAvatarField] === null) {
               const avatarResponse = await fetch(userInfo.profilePictureUrl);
-              const blob = await avatarResponse.blob();
-              const fileType = blob.type;
+              const fileType = avatarResponse.headers.get('content-type');
               const fileExtension = fileType.split('/')[1];
               const fileName=`avatar_${user[this.options.emailField]}_${randomUUID()}`;
-              const file = new File([blob], fileName, { type: fileType });
+              const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
               const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
                 fileName,
                 fileType,
@@ -269,13 +271,16 @@ export default class OAuthPlugin extends AdminForthPlugin {
                 fileExtension,
                 null
               )
-              const res = await fetch(uploadUrl, {
+              if (error) {
+                throw new Error(error);
+              }
+              const res = await fetch(this.serverFetchUrl(uploadUrl, (server as any).getInternalApiOrigin()), {
                 method: 'PUT',
                 headers: {
                   'Content-Type': fileType,
                   ...uploadExtraParams
                 },
-                body: file
+                body: avatarBuffer
               });
 
               const success = res.ok;
@@ -284,11 +289,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
               } else {
                 await this.avatarUploadPlugin.markKeyForNotDeletion(filePath);
                 const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
-                this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
+                await this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
               }
             }
           }
-
           return await this.doLogin(userInfo.email, response, { 
             headers, 
             cookies, 
