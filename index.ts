@@ -228,6 +228,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
           if (!user) {
             // Check if open signup is enabled
             if (!this.options.openSignup?.enabled) {
+                response.setStatus(403);
               return { 
                 error: 'User with your email is not registered in system and signup is not allowed. Please contact your administrator to get access to the system'
               };
@@ -303,6 +304,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
           });
         } catch (error) {
           console.error('OAuth authentication error:', error);
+          response.setStatus(400);
           return { 
             error: `Authentication failed: ${error}`
           };
