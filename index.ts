@@ -1,12 +1,23 @@
-import { AdminForthPlugin, Filters, AdminUser, HttpExtra } from "adminforth";
+import AdminForth, { AdminForthPlugin, Filters, AdminUser, HttpExtra } from "adminforth";
 import type { IAdminForth, AdminForthResource } from "adminforth";
 import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
 import type { OAuth2Adapter } from "adminforth";
 import { AdminForthDataTypes } from "adminforth";
+import { ExternalIdentityStore } from "./externalIdentityStore.js";
+import type { ExternalIdentityResourceOptions, OAuthIdentity } from "./externalIdentityStore.js";
+
+type OAuth2UserInfo = Awaited<ReturnType<OAuth2Adapter['getTokenFromCode']>> & {
+  provider?: string;
+  subject?: string;
+  phone?: string;
+  meta?: Record<string, any>;
+  externalUserId?: string | number | null;
+};
 
 interface OAuthPluginOptions {
   emailField: string;
+  externalIdentityResource?: ExternalIdentityResourceOptions;
   emailConfirmedField?: string;
   userFullNameField?: string;
   adapters: OAuth2Adapter[];
@@ -22,16 +33,29 @@ interface OAuthPluginOptions {
   userAvatarField?: string;
 }
 
+type OAuthProviderState = {
+  provider: string;
+  action?: 'connect';
+  redirectUri?: string;
+};
+
 export default class OAuthPlugin extends AdminForthPlugin {
   private options: OAuthPluginOptions;
   public adminforth: IAdminForth;
   private resource: AdminForthResource;
   public avatarUploadPlugin: any;
+  private externalIdentityStoreInstance: ExternalIdentityStore | null = null;
+  private userPrimaryKeyField: string;
   
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
       throw new Error('OAuthPlugin: emailField is required');
+    }
+    if (!options.externalIdentityResource) {
+      console.warn(
+        'OAuthPlugin: using OAuth without externalIdentityResource is deprecated. Please migrate to the external identity resource configuration.'
+      );
     }
     
     // Set default values for openSignup
@@ -53,6 +77,14 @@ export default class OAuthPlugin extends AdminForthPlugin {
 
     this.adminforth = adminforth;
     this.resource = resource;
+    const userPrimaryKey = resource.columns.find(col => col.primaryKey)?.name;
+    if (!userPrimaryKey) {
+      throw new Error(`OAuthPlugin: user resource "${resource.resourceId}" has no primary key`);
+    }
+    this.userPrimaryKeyField = userPrimaryKey;
+    this.externalIdentityStoreInstance = this.options.externalIdentityResource
+      ? new ExternalIdentityStore(adminforth, this.options.externalIdentityResource)
+      : null;
     adminforth.config.customization.customPages.push({
       path: '/oauth/callback',
       component: { 
@@ -64,6 +96,19 @@ export default class OAuthPlugin extends AdminForthPlugin {
         },
       }
     });
+
+    if (this.options.externalIdentityResource && !adminforth.config.auth.userMenuSettingsPages?.find(page => page.slug === 'connected-accounts')) {
+      if (!adminforth.config.auth.userMenuSettingsPages) {
+        adminforth.config.auth.userMenuSettingsPages = [];
+      }
+      adminforth.config.auth.userMenuSettingsPages.push({
+        icon: 'flowbite:link-outline',
+        pageLabel: 'Connected Accounts',
+        slug: 'connected-accounts',
+        component: this.componentPath('OAuthConnectedAccounts.vue'),
+        isVisible: () => true,
+      });
+    }
 
     // Validate emailField exists in resource
     if (!resource.columns.find(col => col.name === this.options.emailField)) {
@@ -138,6 +183,72 @@ export default class OAuthPlugin extends AdminForthPlugin {
     return new URL(url, internalApiOrigin).toString();
   }
 
+  private async getAdminUserFromCookies(cookies: Array<{ key: string; value: string }>) {
+    const brandSlug = this.adminforth.config.customization.brandNameSlug;
+    const jwt = cookies.find(({ key }) => key === `adminforth_${brandSlug}_jwt`)?.value;
+    return jwt ? await this.adminforth.auth.verify(jwt, 'auth') : null;
+  }
+
+  private async syncUserProfile(user: any, userInfo: OAuth2UserInfo, server: IHttpServer) {
+    if (this.options.userFullNameField && userInfo.fullName) {
+      const userFullName = user[this.options.userFullNameField];
+      if (userFullName && userFullName !== userInfo.fullName) {
+        await this.adminforth.resource(this.resource.resourceId).update(user[this.userPrimaryKeyField], {
+          [this.options.userFullNameField]: userInfo.fullName
+        });
+      }
+    }
+
+    if (!this.options.userAvatarField || !userInfo.profilePictureUrl || user[this.options.userAvatarField] !== null) {
+      return;
+    }
+
+    const avatarResponse = await fetch(userInfo.profilePictureUrl);
+    if (!avatarResponse.ok) {
+      console.error('Failed to fetch avatar for user', user[this.options.emailField]);
+      return;
+    }
+
+    const fileType = avatarResponse.headers.get('content-type');
+    if (!fileType) {
+      console.error('Avatar response has no content-type for user', user[this.options.emailField]);
+      return;
+    }
+
+    const fileExtension = fileType.split('/')[1];
+    const fileName = `avatar_${user[this.options.emailField]}_${randomUUID()}`;
+    const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
+    const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
+      fileName,
+      fileType,
+      null,
+      fileExtension,
+      null
+    );
+    if (error) {
+      throw new Error(error);
+    }
+
+    const res = await fetch(this.serverFetchUrl(uploadUrl, (server as any).getInternalApiOrigin()), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': fileType,
+        ...uploadExtraParams
+      },
+      body: avatarBuffer
+    });
+
+    if (!res.ok) {
+      console.error('Failed to upload avatar for user', user[this.options.emailField]);
+      return;
+    }
+
+    await this.avatarUploadPlugin.markKeyForNotDeletion(filePath);
+    await this.adminforth.resource(this.resource.resourceId).update(user[this.userPrimaryKeyField], {
+      [this.options.userAvatarField]: filePath
+    });
+  }
+
 
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     if (this.options.userAvatarField) {
@@ -159,36 +270,39 @@ export default class OAuthPlugin extends AdminForthPlugin {
   }
 
   async doLogin(email: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
-    const username = email;
     const user = await this.adminforth.resource(this.resource.resourceId).get([
       Filters.EQ(this.options.emailField, email)
     ]);
-    
+
     if (!user) {
       return { error: 'User not found', allowedLogin: false };
     }
 
-    // If emailConfirmedField is set and the field is false, update it to true
+    return this.doLoginUser(user, email, response, extra);
+  }
+
+  async doLoginUser(user: any, username: string, response: any, extra: HttpExtra): Promise<{ error?: string; allowedLogin: boolean; redirectTo?: string; }> {
+    const userPk = user[this.userPrimaryKeyField];
     if (this.options.emailConfirmedField && user[this.options.emailConfirmedField] === false) {
-      await this.adminforth.resource(this.resource.resourceId).update(user.id, {
+      await this.adminforth.resource(this.resource.resourceId).update(userPk, {
         [this.options.emailConfirmedField]: true
       });
     }
 
-  const adminUser = { 
-    dbUser: user,
-    pk: user.id,
-    username,
-  };
-  const toReturn = { allowedLogin: true, error: '' };
+    const adminUser = { 
+      dbUser: user,
+      pk: userPk,
+      username,
+    };
+    const toReturn = { allowedLogin: true, error: '' };
   
-  const rememberMeDuration = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDuration;
-  await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDuration);
+    const rememberMeDuration = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDuration;
+    await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDuration);
     if (toReturn.allowedLogin) {
       this.adminforth.auth.setAuthCookie({ 
         response,
         username,
-        pk: user.id,
+        pk: userPk,
         expireInDuration: rememberMeDuration
       });
     }
@@ -196,6 +310,52 @@ export default class OAuthPlugin extends AdminForthPlugin {
   }
 
   setupEndpoints(server: IHttpServer) {
+    if (this.options.externalIdentityResource) {
+      const externalIdentityStore = this.externalIdentityStoreInstance!;
+
+      server.endpoint({
+        method: 'POST',
+        path: '/oauth/external-identities',
+        handler: async ({ adminUser }) => {
+          return externalIdentityStore.connectedAccounts(adminUser!.pk, this.options.adapters);
+        },
+      });
+
+      server.endpoint({
+        method: 'POST',
+        path: '/oauth/external-identity/disconnect',
+        handler: async ({ body, adminUser }) => {
+          return externalIdentityStore.disconnect(body.identityId, adminUser!.pk);
+        },
+      });
+
+      server.endpoint({
+        method: 'POST',
+        path: '/oauth/external-identity/connect-action',
+        handler: async ({ body }) => {
+          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === body.provider);
+          if (!adapter) {
+            return { error: 'Invalid OAuth provider' };
+          }
+
+          const url = new URL(adapter.getAuthUrl());
+          url.searchParams.set('redirect_uri', body.redirectUri);
+          url.searchParams.set('state', Buffer.from(JSON.stringify({
+            provider: body.provider,
+            action: 'connect',
+            redirectUri: body.redirectUri,
+          })).toString('base64'));
+
+          return {
+            action: {
+              type: 'url',
+              url: url.toString(),
+            },
+          };
+        },
+      });
+    }
+
     server.endpoint({
       method: 'POST',
       path: '/oauth/callback',
@@ -207,26 +367,63 @@ export default class OAuthPlugin extends AdminForthPlugin {
         }
 
         try {
-          // The provider information is now passed through the state parameter
-          const providerState = JSON.parse(Buffer.from(state, 'base64').toString());
-          const provider = providerState.provider;
-
-          const adapter = this.options.adapters.find(a => 
-            a.constructor.name === provider
-          );
-
+          const providerState: OAuthProviderState = JSON.parse(Buffer.from(state, 'base64').toString());
+          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === providerState.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
           }
 
-          const userInfo = await adapter.getTokenFromCode(code, redirect_uri);
+          const userInfo = await adapter.getTokenFromCode(code, providerState.redirectUri || redirect_uri) as OAuth2UserInfo;
+          if (this.externalIdentityStoreInstance || providerState.action === 'connect') {
+            if (!userInfo.provider || !userInfo.subject) {
+              return { error: 'OAuth adapter must return provider and subject when external identities are enabled' };
+            }
+          }
+          const identityPayload = userInfo.provider && userInfo.subject ? userInfo as OAuthIdentity : undefined;
 
-          let user = await this.adminforth.resource(this.resource.resourceId).get([
-            Filters.EQ(this.options.emailField, userInfo.email)
-          ]);
+          if (providerState.action === 'connect') {
+            const externalIdentityStore = this.externalIdentityStoreInstance;
+            if (!externalIdentityStore) {
+              return { error: 'External identities are not configured' };
+            }
+
+            const adminUser = await this.getAdminUserFromCookies(cookies as any);
+            if (!adminUser) {
+              return { error: 'Unauthorized by AdminForth' };
+            }
+
+            await externalIdentityStore.createOrUpdate(adminUser.pk, identityPayload!);
+            return { redirectTo: '/settings/connected-accounts' };
+          }
+
+          const externalIdentityStore = this.externalIdentityStoreInstance;
+          let user;
+          if (externalIdentityStore) {
+            const identity = await externalIdentityStore.findByIdentity(identityPayload!);
+            user = identity ? await this.adminforth.resource(this.resource.resourceId).get(
+              Filters.EQ(this.userPrimaryKeyField, externalIdentityStore.linkedAdminUserPk(identity))
+            ) : null;
+
+            if (!user && userInfo.email) {
+              user = await this.adminforth.resource(this.resource.resourceId).get(
+                Filters.EQ(this.options.emailField, userInfo.email)
+              );
+              if (user) {
+                await externalIdentityStore.createOrUpdate(user[this.userPrimaryKeyField], identityPayload!);
+              }
+            }
+          } else if (userInfo.email) {
+            user = await this.adminforth.resource(this.resource.resourceId).get(
+              Filters.EQ(this.options.emailField, userInfo.email)
+            );
+          }
 
           if (!user) {
-            // Check if open signup is enabled
+            if (!userInfo.email) {
+              return {
+                error: 'OAuth provider did not return an email and signup is not possible. Please contact your administrator to get access to the system'
+              };
+            }
             if (!this.options.openSignup?.enabled) {
                 response.setStatus(403);
               return { 
@@ -234,67 +431,25 @@ export default class OAuthPlugin extends AdminForthPlugin {
               };
             }
 
-            // When creating a new user, set emailConfirmedField to true if it's configured
             const createData: any = {
               [this.options.emailField]: userInfo.email,
-              [this.adminforth.config.auth.passwordHashField]: '',
+              [this.adminforth.config.auth.passwordHashField]: await AdminForth.Utils.generatePasswordHash(randomUUID()),
               ...this.options.openSignup.defaultFieldValues
             };
-            
+
             if (this.options.emailConfirmedField) {
               createData[this.options.emailConfirmedField] = true;
             }
 
-            user = await this.adminforth.resource(this.resource.resourceId).create(createData);
-          }
-
-          if ( this.options.userFullNameField && userInfo.fullName ) {
-            const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
-            const userFullName = user[this.options.userFullNameField];
-            if (userFullName && userFullName !== userInfo.fullName) {
-              await this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {
-                [this.options.userFullNameField]: userInfo.fullName
-              });
+            const createResult = await this.adminforth.resource(this.resource.resourceId).create(createData);
+            user = createResult.createdRecord;
+            if (identityPayload) {
+              await this.externalIdentityStoreInstance?.createOrUpdate(user[this.userPrimaryKeyField], identityPayload);
             }
           }
-          if ( this.options.userAvatarField && userInfo.profilePictureUrl ) {
-            const user = await this.adminforth.resource(this.resource.resourceId).get(Filters.EQ(this.options.emailField, userInfo.email));
-            if (user && user[this.options.userAvatarField] === null) {
-              const avatarResponse = await fetch(userInfo.profilePictureUrl);
-              const fileType = avatarResponse.headers.get('content-type');
-              const fileExtension = fileType.split('/')[1];
-              const fileName=`avatar_${user[this.options.emailField]}_${randomUUID()}`;
-              const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
-              const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
-                fileName,
-                fileType,
-                null,
-                fileExtension,
-                null
-              )
-              if (error) {
-                throw new Error(error);
-              }
-              const res = await fetch(this.serverFetchUrl(uploadUrl, (server as any).getInternalApiOrigin()), {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': fileType,
-                  ...uploadExtraParams
-                },
-                body: avatarBuffer
-              });
 
-              const success = res.ok;
-              if (!success) {
-                console.error('Failed to upload avatar for user', user[this.options.emailField]);
-              } else {
-                await this.avatarUploadPlugin.markKeyForNotDeletion(filePath);
-                const userResourcePrimaryKey = this.resource.columns.find(col => col.primaryKey)?.name;
-                await this.adminforth.resource(this.resource.resourceId).update(user[userResourcePrimaryKey], {[this.options.userAvatarField]: filePath} )
-              }
-            }
-          }
-          return await this.doLogin(userInfo.email, response, { 
+          await this.syncUserProfile(user, userInfo, server);
+          return await this.doLoginUser(user, user[this.options.emailField], response, { 
             headers, 
             cookies, 
             requestUrl,

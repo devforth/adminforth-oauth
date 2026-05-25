@@ -23,6 +23,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useCoreStore } from '@/stores/core';
 import { useRouter, useRoute } from 'vue-router';
 import { callAdminForthApi } from '@/utils';
 import { Spinner, LinkButton } from '@/afcl';
@@ -32,6 +33,7 @@ const { t } = useI18n();
 
 const router = useRouter();
 const userStore = useUserStore();
+const coreStore = useCoreStore();
 const route = useRoute();
 const error = ref(null);
 
@@ -47,14 +49,16 @@ onMounted(async () => {
   if (code && state && redirectUri) {
     const encodedCode = encodeURIComponent(code);
     const encodedState = encodeURIComponent(state);
+    const encodedRedirectUri = encodeURIComponent(redirectUri);
     const response = await callAdminForthApi({
-      path: `/oauth/callback?code=${encodedCode}&state=${encodedState}&redirect_uri=${redirectUri}`,
+      path: `/oauth/callback?code=${encodedCode}&state=${encodedState}&redirect_uri=${encodedRedirectUri}`,
       method: 'POST',
     });
     
     if (response.allowedLogin) {
       await userStore.finishLogin();
     } else if (response.redirectTo) {
+      await coreStore.fetchMenuAndResource();
       router.push(response.redirectTo);
     } else if (response.error) {
       error.value = response.error;
