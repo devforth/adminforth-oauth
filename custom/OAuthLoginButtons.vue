@@ -60,9 +60,9 @@ function tryStartOAuth(query) {
   if (provider) {
     window.location.href = handleLogin(provider.authUrl);
   } else if (query.start_oauth === '') {
-    alert({ variant: 'danger', message: t('Empty OAuth provider') });
+    alert({ variant: 'warning', message: t('Empty OAuth provider') });
   } else {
-    alert({ variant: 'danger', message: t('Unknown OAuth provider: {provider}', { provider: query.start_oauth }) });
+    alert({ variant: 'warning', message: t('Unknown OAuth provider: {provider}', { provider: query.start_oauth }) });
   }
 }
 
