@@ -20,6 +20,21 @@ Full setup and configuration guide:
 
 [AdminForth OAuth Documentation](https://adminforth.dev/docs/tutorial/Plugins/oauth/)
 
+## Starting OAuth flow from an external page
+
+If you have an external website with a "Sign in with Google" button that should open the AdminForth OAuth flow directly — without showing the login form first — use the `start_oauth` query parameter:
+
+```
+https://your-admin.example.com/login?start_oauth=google
+https://your-admin.example.com/login?start_oauth=clerk
+```
+
+The value must match the provider name (case-insensitive). AdminForth will immediately redirect the user to the OAuth provider, skipping the login page entirely.
+
+**Supported values** depend on the providers configured in your plugin setup. The name is derived from the adapter class name — for example `AdminForthAdapterOauth2Google` → `google`, `AdminForthAdapterOauth2Clerk` → `clerk`.
+
+If the specified provider is not found, an error message is shown on the login page. If `start_oauth` is provided without a value (`?start_oauth`), nothing happens and the regular login form is displayed.
+
 ## About AdminForth
 
 AdminForth is an open-source, agent-first admin framework for building robust admin panels and back-office applications faster.
