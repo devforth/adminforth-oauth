@@ -17,12 +17,21 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useAdminforth } from '@/adminforth';
+import { useI18n } from 'vue-i18n';
+
 const props = defineProps({
   meta: {
     type: Object,
     required: true
   }
 });
+
+const route = useRoute();
+const { alert } = useAdminforth();
+const { t } = useI18n();
 
 const getProviderName = (provider) => {
   return provider.replace('AdminForthAdapter', '').replace('Oauth2', '');
@@ -40,4 +49,24 @@ const handleLogin = (authUrl) => {
   url.searchParams.set('redirect_uri', redirectUri);
   return url.toString();
 };
+
+function tryStartOAuth(query) {
+  if (!('start_oauth' in query)) return;
+
+  const provider = props.meta.providers.find(({ provider }) =>
+    getProviderName(provider).toLowerCase() === query.start_oauth.toLowerCase()
+  );
+
+  if (provider) {
+    window.location.href = handleLogin(provider.authUrl);
+  } else if (query.start_oauth === '') {
+    alert({ variant: 'danger', message: t('Empty OAuth provider') });
+  } else {
+    alert({ variant: 'danger', message: t('Unknown OAuth provider: {provider}', { provider: query.start_oauth }) });
+  }
+}
+
+onMounted(() => {
+  tryStartOAuth(route.query);
+});
 </script>
