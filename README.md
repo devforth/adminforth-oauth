@@ -12,6 +12,7 @@ Enables OAuth2-based authentication for an adminforth application.
 - Support external identity providers for sign-in.
 - Reduce friction in authentication workflows.
 - Integrate provider-based auth into the admin panel.
+- Start OAuth flow directly from an external page via `?start_oauth=<provider>` query parameter.
 
 ## Documentation
 
