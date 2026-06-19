@@ -6,6 +6,7 @@ import type { OAuth2Adapter } from "adminforth";
 import { AdminForthDataTypes } from "adminforth";
 import { ExternalIdentityStore } from "./externalIdentityStore.js";
 import type { ExternalIdentityResourceOptions, OAuthIdentity } from "./externalIdentityStore.js";
+import { clearNonceCookie, consumeOAuthState, issueOAuthState } from "./oauthState.js";
 
 type OAuth2UserInfo = Awaited<ReturnType<OAuth2Adapter['getTokenFromCode']>> & {
   provider?: string;
@@ -32,12 +33,6 @@ interface OAuthPluginOptions {
   componentsOrderUnderLoginButton?: number;
   userAvatarField?: string;
 }
-
-type OAuthProviderState = {
-  provider: string;
-  action?: 'connect';
-  redirectUri?: string;
-};
 
 export default class OAuthPlugin extends AdminForthPlugin {
   private options: OAuthPluginOptions;
@@ -145,17 +140,11 @@ export default class OAuthPlugin extends AdminForthPlugin {
     const componentPath = `@@/plugins/${this.constructor.name}/OAuthLoginButtons.vue`;
     this.componentPath('OAuthLoginButtons.vue');
 
-    const providers = this.options.adapters.map(adapter => {
-      const state = Buffer.from(JSON.stringify({
-        provider: adapter.constructor.name
-      })).toString('base64');
-      return {
-        authUrl: `${adapter.getAuthUrl()}&state=${state}`,
-        provider: adapter.constructor.name,
-        icon: adapter.getIcon(),
-        buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
-      };
-    });
+    const providers = this.options.adapters.map(adapter => ({
+      provider: adapter.constructor.name,
+      icon: adapter.getIcon(),
+      buttonText: `${this.options.buttonText ? this.options.buttonText : 'Continue with'} ${(adapter.getName ? adapter.getName() : adapter.constructor.name)}`,
+    }));
 
 
     const plugins = this.resource.plugins;
@@ -332,7 +321,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/connect-action',
-        handler: async ({ body }) => {
+        handler: async ({ body, response }) => {
           const adapter = this.options.adapters.find(adapter => adapter.constructor.name === body.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
@@ -340,11 +329,11 @@ export default class OAuthPlugin extends AdminForthPlugin {
 
           const url = new URL(adapter.getAuthUrl());
           url.searchParams.set('redirect_uri', body.redirectUri);
-          url.searchParams.set('state', Buffer.from(JSON.stringify({
+          url.searchParams.set('state', issueOAuthState(this.adminforth, response, {
             provider: body.provider,
             action: 'connect',
             redirectUri: body.redirectUri,
-          })).toString('base64'));
+          }));
 
           return {
             action: {
@@ -360,14 +349,39 @@ export default class OAuthPlugin extends AdminForthPlugin {
       method: 'POST',
       path: '/oauth/callback',
       noAuth: true,
-      handler: async ({ query, response, headers, cookies, requestUrl }) => {
+      handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
         const { code, state, redirect_uri } = query;
         if (!code) {
-          return { error: 'No authorization code provided' };
+          if (!body.provider) {
+            return { error: 'No authorization code provided' };
+          }
+
+          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === body.provider);
+          if (!adapter) {
+            return { error: 'Invalid OAuth provider' };
+          }
+
+          const url = new URL(adapter.getAuthUrl());
+          url.searchParams.set('redirect_uri', body.redirectUri);
+          url.searchParams.set('state', issueOAuthState(this.adminforth, response, {
+            provider: body.provider,
+            redirectUri: body.redirectUri,
+          }));
+
+          return {
+            action: {
+              type: 'url',
+              url: url.toString(),
+            },
+          };
+        }
+
+        if (!state) {
+          return { error: 'No OAuth state provided' };
         }
 
         try {
-          const providerState: OAuthProviderState = JSON.parse(Buffer.from(state, 'base64').toString());
+          const providerState = await consumeOAuthState(this.adminforth, state, cookies as any, response);
           const adapter = this.options.adapters.find(adapter => adapter.constructor.name === providerState.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
@@ -449,7 +463,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
           }
 
           await this.syncUserProfile(user, userInfo, server);
-          return await this.doLoginUser(user, user[this.options.emailField], response, { 
+          const loginResult = await this.doLoginUser(user, user[this.options.emailField], response, { 
             headers, 
             cookies, 
             requestUrl,
@@ -457,6 +471,8 @@ export default class OAuthPlugin extends AdminForthPlugin {
             body: {},
             response
           });
+          clearNonceCookie(this.adminforth, response);
+          return loginResult;
         } catch (error) {
           console.error('OAuth authentication error:', error);
           response.setStatus(400);
