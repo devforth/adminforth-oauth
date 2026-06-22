@@ -1,4 +1,4 @@
-import AdminForth, { AdminForthPlugin, Filters, AdminUser, HttpExtra } from "adminforth";
+import AdminForth, { AdminForthPlugin, Filters, AdminUser, HttpExtra, RateLimiter } from "adminforth";
 import type { IAdminForth, AdminForthResource } from "adminforth";
 import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
@@ -41,6 +41,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
   public avatarUploadPlugin: any;
   private externalIdentityStoreInstance: ExternalIdentityStore | null = null;
   private userPrimaryKeyField: string;
+  private oauthRateLimiters: RateLimiter[] = [];
   
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
@@ -72,6 +73,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
 
     this.adminforth = adminforth;
     this.resource = resource;
+    this.oauthRateLimiters = (adminforth.config.auth as any).rateLimit.map((rate) => new RateLimiter(rate));
     const userPrimaryKey = resource.columns.find(col => col.primaryKey)?.name;
     if (!userPrimaryKey) {
       throw new Error(`OAuthPlugin: user resource "${resource.resourceId}" has no primary key`);
@@ -350,6 +352,13 @@ export default class OAuthPlugin extends AdminForthPlugin {
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
+        const oauthRateLimitKey = this.adminforth.auth.getClientIp(headers) || 'unknown';
+        const rateLimitResults = await Promise.all(this.oauthRateLimiters.map((limiter) => limiter.consume(oauthRateLimitKey)));
+        if (!rateLimitResults.every(Boolean)) {
+          response.setStatus(429);
+          return { error: 'Too many login attempts, please try again later' };
+        }
+
         const { code, state, redirect_uri } = query;
         if (!code) {
           if (!body.provider) {
