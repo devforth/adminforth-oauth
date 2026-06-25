@@ -1,2 +1,4 @@
 allowBuilds:
   adminforth: true
+minimumReleaseAgeExclude:
+  - adminforth
