@@ -1,4 +1,4 @@
-import AdminForth, { AdminForthPlugin, Filters, AdminUser, HttpExtra, RateLimiter } from "adminforth";
+import AdminForth, { AdminForthPlugin, parseBody, Filters, AdminUser, HttpExtra, RateLimiter } from "adminforth";
 import type { IAdminForth, AdminForthResource } from "adminforth";
 import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
@@ -58,22 +58,6 @@ export default class OAuthPlugin extends AdminForthPlugin {
   private userPrimaryKeyField: string;
   private oauthRateLimiters: RateLimiter[] = [];
   
-  private parseBody<T>(
-    schema: z.ZodType<T>,
-    body: unknown,
-    response: { setStatus: (code: number, message: string) => void },
-  ): { ok: true; data: T } | { ok: false; error: { error: string; details: unknown } } {
-    const parsed = schema.safeParse(body ?? {});
-    if (!parsed.success) {
-      response.setStatus(400, '');
-      return {
-        ok: false,
-        error: { error: 'Request body validation failed', details: parsed.error.issues },
-      };
-    }
-    return { ok: true, data: parsed.data };
-  }
-
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
@@ -347,7 +331,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         method: 'POST',
         path: '/oauth/external-identity/disconnect',
         handler: async ({ body, adminUser, response }) => {
-          const parsed = this.parseBody(oauthDisconnectBodySchema, body, response);
+          const parsed = parseBody(oauthDisconnectBodySchema, body, response);
           if ('error' in parsed) return parsed.error;
           const data = parsed.data;
           return externalIdentityStore.disconnect(data.identityId, adminUser!.pk);
@@ -358,7 +342,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
         method: 'POST',
         path: '/oauth/external-identity/connect-action',
         handler: async ({ body, response }) => {
-          const parsed = this.parseBody(oauthConnectActionBodySchema, body, response);
+          const parsed = parseBody(oauthConnectActionBodySchema, body, response);
           if ('error' in parsed) return parsed.error;
           const data = parsed.data;
           const adapter = this.options.adapters.find(adapter => adapter.constructor.name === data.provider);
@@ -389,7 +373,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
-        const parsed = this.parseBody(oauthCallbackBodySchema, body, response);
+        const parsed = parseBody(oauthCallbackBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         const oauthRateLimitKey = this.adminforth.auth.getClientIp(headers) || 'unknown';
