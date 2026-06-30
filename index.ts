@@ -7,6 +7,21 @@ import { AdminForthDataTypes } from "adminforth";
 import { ExternalIdentityStore } from "./externalIdentityStore.js";
 import type { ExternalIdentityResourceOptions, OAuthIdentity } from "./externalIdentityStore.js";
 import { clearNonceCookie, consumeOAuthState, issueOAuthState } from "./oauthState.js";
+import { z } from "zod";
+
+const oauthDisconnectBodySchema = z.object({
+  identityId: z.string(),
+}).strict();
+
+const oauthConnectActionBodySchema = z.object({
+  provider: z.string(),
+  redirectUri: z.string(),
+}).strict();
+
+const oauthCallbackBodySchema = z.object({
+  provider: z.string().optional(),
+  redirectUri: z.string().optional(),
+}).strict();
 
 type OAuth2UserInfo = Awaited<ReturnType<OAuth2Adapter['getTokenFromCode']>> & {
   provider?: string;
@@ -43,6 +58,19 @@ export default class OAuthPlugin extends AdminForthPlugin {
   private userPrimaryKeyField: string;
   private oauthRateLimiters: RateLimiter[] = [];
   
+  private parseBody<T>(
+    schema: z.ZodType<T>,
+    body: unknown,
+    response: { setStatus: (code: number, message: string) => void },
+  ): T | null {
+    const parsed = schema.safeParse(body ?? {});
+    if (!parsed.success) {
+      response.setStatus(422, parsed.error.message);
+      return null;
+    }
+    return parsed.data;
+  }
+
   constructor(options: OAuthPluginOptions) {
     super(options, import.meta.url);
     if (!options.emailField) {
@@ -315,8 +343,10 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/disconnect',
-        handler: async ({ body, adminUser }) => {
-          return externalIdentityStore.disconnect(body.identityId, adminUser!.pk);
+        handler: async ({ body, adminUser, response }) => {
+          const data = this.parseBody(oauthDisconnectBodySchema, body, response);
+          if (!data) return;
+          return externalIdentityStore.disconnect(data.identityId, adminUser!.pk);
         },
       });
 
@@ -324,17 +354,19 @@ export default class OAuthPlugin extends AdminForthPlugin {
         method: 'POST',
         path: '/oauth/external-identity/connect-action',
         handler: async ({ body, response }) => {
-          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === body.provider);
+          const data = this.parseBody(oauthConnectActionBodySchema, body, response);
+          if (!data) return;
+          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === data.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
           }
 
           const url = new URL(adapter.getAuthUrl());
-          url.searchParams.set('redirect_uri', body.redirectUri);
+          url.searchParams.set('redirect_uri', data.redirectUri);
           url.searchParams.set('state', issueOAuthState(this.adminforth, response, {
-            provider: body.provider,
+            provider: data.provider,
             action: 'connect',
-            redirectUri: body.redirectUri,
+            redirectUri: data.redirectUri,
           }));
 
           return {
@@ -352,6 +384,8 @@ export default class OAuthPlugin extends AdminForthPlugin {
       path: '/oauth/callback',
       noAuth: true,
       handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
+        const data = this.parseBody(oauthCallbackBodySchema, body, response);
+        if (!data) return;
         const oauthRateLimitKey = this.adminforth.auth.getClientIp(headers) || 'unknown';
         const rateLimitResults = await Promise.all(this.oauthRateLimiters.map((limiter) => limiter.consume(oauthRateLimitKey)));
         if (!rateLimitResults.every(Boolean)) {
@@ -361,20 +395,20 @@ export default class OAuthPlugin extends AdminForthPlugin {
 
         const { code, state, redirect_uri } = query;
         if (!code) {
-          if (!body.provider) {
+          if (!data.provider) {
             return { error: 'No authorization code provided' };
           }
 
-          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === body.provider);
+          const adapter = this.options.adapters.find(adapter => adapter.constructor.name === data.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
           }
 
           const url = new URL(adapter.getAuthUrl());
-          url.searchParams.set('redirect_uri', body.redirectUri);
+          url.searchParams.set('redirect_uri', data.redirectUri as string);
           url.searchParams.set('state', issueOAuthState(this.adminforth, response, {
-            provider: body.provider,
-            redirectUri: body.redirectUri,
+            provider: data.provider,
+            redirectUri: data.redirectUri,
           }));
 
           return {

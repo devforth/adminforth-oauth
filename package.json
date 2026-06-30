@@ -24,6 +24,9 @@
   "author": "DevForth (https://devforth.io)",
   "license": "MIT",
   "description": "AdminForth OAuth Plugin",
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@types/node": "^22.10.7",
     "adminforth": "^3.6.21",
