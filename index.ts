@@ -1,4 +1,4 @@
-import AdminForth, { AdminForthPlugin, parseBody, Filters, AdminUser, HttpExtra, RateLimiter } from "adminforth";
+import AdminForth, { AdminForthPlugin, Filters, AdminUser, HttpExtra, RateLimiter } from "adminforth";
 import type { IAdminForth, AdminForthResource } from "adminforth";
 import { IHttpServer } from "adminforth";
 import { randomUUID } from 'crypto';
@@ -330,10 +330,9 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/disconnect',
+        request_schema: oauthDisconnectBodySchema,
         handler: async ({ body, adminUser, response }) => {
-          const parsed = parseBody(oauthDisconnectBodySchema, body, response);
-          if ('error' in parsed) return parsed.error;
-          const data = parsed.data;
+          const data = body as z.infer<typeof oauthDisconnectBodySchema>;
           return externalIdentityStore.disconnect(data.identityId, adminUser!.pk);
         },
       });
@@ -341,10 +340,9 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/connect-action',
+        request_schema: oauthConnectActionBodySchema,
         handler: async ({ body, response }) => {
-          const parsed = parseBody(oauthConnectActionBodySchema, body, response);
-          if ('error' in parsed) return parsed.error;
-          const data = parsed.data;
+          const data = body as z.infer<typeof oauthConnectActionBodySchema>;
           const adapter = this.options.adapters.find(adapter => adapter.constructor.name === data.provider);
           if (!adapter) {
             return { error: 'Invalid OAuth provider' };
@@ -372,10 +370,9 @@ export default class OAuthPlugin extends AdminForthPlugin {
       method: 'POST',
       path: '/oauth/callback',
       noAuth: true,
+      request_schema: oauthCallbackBodySchema,
       handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
-        const parsed = parseBody(oauthCallbackBodySchema, body, response);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof oauthCallbackBodySchema>;
         const oauthRateLimitKey = this.adminforth.auth.getClientIp(headers) || 'unknown';
         const rateLimitResults = await Promise.all(this.oauthRateLimiters.map((limiter) => limiter.consume(oauthRateLimitKey)));
         if (!rateLimitResults.every(Boolean)) {
