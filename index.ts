@@ -309,7 +309,8 @@ export default class OAuthPlugin extends AdminForthPlugin {
         response,
         username,
         pk: userPk,
-        expireInDuration: rememberMeDuration
+        expireInDuration: rememberMeDuration,
+        extra,
       });
     }
     return toReturn;
