@@ -305,7 +305,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     const rememberMeDuration = this.options.authenticationExpireDuration ?? this.adminforth.config.auth.rememberMeDuration;
     await this.adminforth.restApi.processLoginCallbacks(adminUser, toReturn, response, { ...extra }, rememberMeDuration);
     if (toReturn.allowedLogin) {
-      this.adminforth.auth.setAuthCookie({ 
+      await this.adminforth.auth.setAuthCookie({
         response,
         username,
         pk: userPk,
