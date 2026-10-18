@@ -1,21 +1,20 @@
 <template>
   <div :class="meta.iconOnly ? 'flex flex-row justify-center items-center gap-3' : 'flex flex-col justify-center items-center gap-2'" >
-    <button
-      v-for="provider in meta.providers" 
+    <Button
+      v-for="provider in meta.providers"
       :key="provider.provider"
       type="button"
-      class="border dark:border-gray-400 flex items-center justify-center hover:bg-gray-50 hover:dark:border-gray-300 hover:dark:bg-gray-700"
-      :class="[
-        meta.iconOnly ? 'w-11 h-11 p-0' : 'w-full py-2 px-4',
-        meta.pill ? 'rounded-full' : 'rounded-md',
-        startingProvider === provider.provider ? 'pointer-events-none opacity-70' : ''
-      ]"
+      variant="secondary"
+      :iconOnly="meta.iconOnly"
+      :class="[meta.iconOnly ? 'w-11 h-11' : 'w-full', { 'rounded-full': meta.pill }]"
+      :aria-label="meta.iconOnly ? getButtonText(provider.buttonText) : undefined"
       :disabled="startingProvider === provider.provider"
+      :loader="startingProvider === provider.provider"
       @click="handleLogin(provider.provider)"
     >
-      <div v-html="provider.icon" class="w-5 h-5 dark:text-white" :class="meta.iconOnly ? 'mr-0' : 'mr-2'" :alt="getProviderName(provider.provider)" />
-      <span v-if="!meta.iconOnly" class="font-medium dark:text-white">{{ getButtonText(provider.buttonText) }}</span>
-    </button>
+      <div v-html="provider.icon" class="w-5 h-5" />
+      <span v-if="!meta.iconOnly">{{ getButtonText(provider.buttonText) }}</span>
+    </Button>
   </div>
 </template>
 
@@ -23,6 +22,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAdminforth } from '@/adminforth';
+import { Button } from '@/afcl';
 import { callAdminForthApi } from '@/utils';
 import { useI18n } from 'vue-i18n';
 

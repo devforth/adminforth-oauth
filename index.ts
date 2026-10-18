@@ -114,8 +114,8 @@ export default class OAuthPlugin extends AdminForthPlugin {
         adminforth.config.auth.userMenuSettingsPages = [];
       }
       adminforth.config.auth.userMenuSettingsPages.push({
-        icon: 'flowbite:link-outline',
-        pageLabel: 'Connected Accounts',
+        icon: 'lucide:link',
+        pageLabel: 'Connected accounts',
         slug: 'connected-accounts',
         component: this.componentPath('OAuthConnectedAccounts.vue'),
         isVisible: () => true,

@@ -1,42 +1,33 @@
 <template>
-  <div class="flex flex-col justify-center mr-6 md:mr-12">
-    <h2 class="flex items-start justify-start leading-none text-gray-800 dark:text-gray-50 text-3xl font-semibold">
-      {{ $t('Connected Accounts') }}
-    </h2>
-    <p class="text-sm mt-3">
-      {{ $t('Connect external accounts to your AdminForth user') }}
-    </p>
+  <div>
+    <PageHeader
+      :title="$t('Connected accounts')"
+      :description="$t('Connect an external account to sign in without a password.')"
+    />
 
-    <div class="mt-6 flex flex-wrap gap-4">
+    <div class="mt-6 overflow-hidden rounded-lg border border-lightCardBorder bg-lightCardBackground dark:border-darkCardBorder dark:bg-darkCardBackground">
       <div
         v-for="provider in providers"
         :key="provider.provider"
-        class="flex flex-col w-full lg:w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm"
+        class="flex flex-wrap items-center gap-3 border-b border-lightCardBorder px-4 py-3.5 last:border-b-0 dark:border-darkCardBorder"
       >
-        <div class="flex items-center justify-between gap-3 mb-4">
-          <div class="min-w-0 flex items-center gap-3">
-            <div v-html="provider.icon" class="w-6 h-6 shrink-0 dark:text-white" />
-            <div class="min-w-0">
-              <p class="font-semibold text-gray-900 dark:text-white truncate">
-                {{ provider.name }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ provider.connected ? $t('Connected') : $t('Not connected') }}
-              </p>
-            </div>
-          </div>
-          <span
-            class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-            :class="provider.connected
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'"
-          >
-            {{ provider.connected ? $t('Active') : $t('Inactive') }}
-          </span>
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-lightCardBorder bg-lightSecondaryDarken text-lightCardTitle dark:border-darkCardBorder dark:bg-darkSecondaryLighten dark:text-darkCardTitle">
+          <div v-html="provider.icon" class="h-5 w-5" />
         </div>
-
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-medium text-lightCardTitle dark:text-darkCardTitle">
+            {{ provider.name }}
+          </p>
+          <p
+            class="text-xs"
+            :class="provider.connected ? 'text-lightSuccess dark:text-darkSuccess' : 'text-lightCardDescription dark:text-darkCardDescription'"
+          >
+            {{ provider.connected ? $t('Connected') : $t('Not connected') }}
+          </p>
+        </div>
         <Button
-          class="w-full mt-auto"
+          variant="secondary"
+          size="sm"
           :disabled="connectingProvider === provider.provider"
           :loader="connectingProvider === provider.provider"
           @click="connectProvider(provider.provider)"
@@ -46,74 +37,64 @@
       </div>
     </div>
 
-    <div v-if="identities.length" class="mt-6 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead class="bg-gray-50 dark:bg-gray-800">
-          <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-              {{ $t('Account') }}
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-              {{ $t('Provider') }}
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-              {{ $t('Identifier') }}
-            </th>
-            <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-              {{ $t('Actions') }}
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-          <tr v-for="identity in identities" :key="`${identity.provider}:${identity.subject}`">
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-3">
-                <img
-                  v-if="identity.avatarUrl"
-                  :src="identity.avatarUrl"
-                  class="h-9 w-9 rounded-full object-cover"
-                  alt=""
-                />
-                <div v-else class="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
-                <div class="min-w-0">
-                  <p class="truncate font-medium text-gray-900 dark:text-white">
-                    {{ identity.fullName || identity.email || identity.phone || identity.subject }}
-                  </p>
-                  <p v-if="identity.email || identity.phone" class="truncate text-xs text-gray-500 dark:text-gray-400">
-                    {{ identity.email || identity.phone }}
-                  </p>
-                </div>
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-2">
-                <div v-if="identity.providerIcon" v-html="identity.providerIcon" class="h-5 w-5 shrink-0" />
-                <span class="text-sm text-gray-700 dark:text-gray-200">{{ identity.providerName }}</span>
-              </div>
-            </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-              {{ identity.subject }}
-            </td>
-            <td class="px-4 py-3 text-right">
-              <button
-                type="button"
-                class="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
-                :disabled="disconnectingIdentity === identity.id"
-                @click="disconnectIdentity(identity.id)"
-              >
-                {{ disconnectingIdentity === identity.id ? $t('Disconnecting') : $t('Disconnect') }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <Table
+      v-if="identities.length"
+      class="mt-6"
+      :columns="identityColumns"
+      :data="identities"
+    >
+      <template #cell:account="{ item }">
+        <div class="flex items-center gap-3">
+          <img
+            v-if="item.avatarUrl"
+            :src="item.avatarUrl"
+            class="h-8 w-8 shrink-0 rounded-full object-cover"
+            alt=""
+          />
+          <div v-else class="h-8 w-8 shrink-0 rounded-full bg-lightSecondaryDarken dark:bg-darkSecondaryLighten" />
+          <div class="min-w-0">
+            <p class="truncate font-medium">
+              {{ item.fullName || item.email || item.phone || item.subject }}
+            </p>
+            <p v-if="item.email || item.phone" class="truncate text-xs text-lightInputIconColor dark:text-darkInputIconColor">
+              {{ item.email || item.phone }}
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <template #cell:providerName="{ item }">
+        <div class="flex items-center gap-2">
+          <div v-if="item.providerIcon" v-html="item.providerIcon" class="h-4 w-4 shrink-0" />
+          <span>{{ item.providerName }}</span>
+        </div>
+      </template>
+
+      <template #cell:subject="{ item }">
+        <span class="text-lightInputIconColor dark:text-darkInputIconColor">{{ item.subject }}</span>
+      </template>
+
+      <template #cell:actions="{ item }">
+        <div class="flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="disconnectingIdentity === item.id"
+            :loader="disconnectingIdentity === item.id"
+            @click="disconnectIdentity(item.id)"
+          >
+            {{ $t('Disconnect') }}
+          </Button>
+        </div>
+      </template>
+    </Table>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { Button } from '@/afcl';
+import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { Button, PageHeader, Table } from '@/afcl';
 import { callAdminForthApi } from '@/utils';
 import { useCoreStore } from '@/stores/core';
 
@@ -141,6 +122,14 @@ const identities = ref<OAuthIdentity[]>([]);
 const connectingProvider = ref<string | null>(null);
 const disconnectingIdentity = ref<string | null>(null);
 const coreStore = useCoreStore();
+const { t } = useI18n();
+
+const identityColumns = computed(() => [
+  { label: t('Account'), fieldName: 'account' },
+  { label: t('Provider'), fieldName: 'providerName' },
+  { label: t('Identifier'), fieldName: 'subject' },
+  { label: t('Actions'), fieldName: 'actions' },
+]);
 
 onMounted(async () => {
   await loadProviders();
