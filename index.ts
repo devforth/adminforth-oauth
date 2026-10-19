@@ -331,6 +331,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/disconnect',
+        agent: { hiddenFromAgents: true },
         request_schema: oauthDisconnectBodySchema,
         handler: async ({ body, adminUser, response }) => {
           const data = body as z.infer<typeof oauthDisconnectBodySchema>;
@@ -341,6 +342,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
       server.endpoint({
         method: 'POST',
         path: '/oauth/external-identity/connect-action',
+        agent: { hiddenFromAgents: true },
         request_schema: oauthConnectActionBodySchema,
         handler: async ({ body, response }) => {
           const data = body as z.infer<typeof oauthConnectActionBodySchema>;
@@ -370,6 +372,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: '/oauth/callback',
+      agent: { hiddenFromAgents: true },
       noAuth: true,
       request_schema: oauthCallbackBodySchema,
       handler: async ({ body, query, response, headers, cookies, requestUrl }) => {
