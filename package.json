@@ -60,6 +60,6 @@
     ]
   },
   "peerDependencies": {
-    "adminforth": "^4.1.0"
+    "adminforth": "^4.7.3"
   }
 }
