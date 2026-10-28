@@ -224,7 +224,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     const fileExtension = fileType.split('/')[1];
     const fileName = `avatar_${user[this.options.emailField]}_${randomUUID()}`;
     const avatarBuffer = Buffer.from(await avatarResponse.arrayBuffer());
-    const { uploadUrl, uploadExtraParams, filePath, error } = await this.avatarUploadPlugin.getFileUploadUrl(
+    const { uploadUrl, uploadExtraParams, filePath, error, contentType } = await this.avatarUploadPlugin.getFileUploadUrl(
       fileName,
       fileType,
       null,
@@ -238,7 +238,7 @@ export default class OAuthPlugin extends AdminForthPlugin {
     const res = await fetch(this.serverFetchUrl(uploadUrl, (server as any).getInternalApiOrigin()), {
       method: 'PUT',
       headers: {
-        'Content-Type': fileType,
+        'Content-Type': contentType || fileType,
         ...uploadExtraParams
       },
       body: avatarBuffer
